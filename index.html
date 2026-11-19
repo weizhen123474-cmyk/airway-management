@@ -53,6 +53,12 @@ figure.narrow{max-width:420px}
 figcaption{font-size:13px;color:var(--muted);line-height:1.6}
 .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;align-items:start}
 .num{font-family:var(--display);font-size:26px;font-weight:700;color:var(--accent)}
+.save-btn{position:fixed;right:16px;bottom:16px;z-index:10;font:inherit;font-size:15px;font-weight:500;color:#fff;background:var(--accent);border:none;border-radius:999px;padding:12px 20px;box-shadow:0 4px 14px rgba(0,0,0,.18);cursor:pointer}
+.save-btn:hover{filter:brightness(1.08)}
+.save-btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.save-btn[disabled]{opacity:.7;cursor:progress}
+@media (prefers-color-scheme: dark){.save-btn{color:#10151f}}
+@media print{.save-btn{display:none}}
 footer{font-size:14px;color:var(--muted);border-top:1px solid var(--line);padding-top:20px;display:flex;flex-direction:column;gap:6px}
 </style>
 </head>
@@ -322,5 +328,38 @@ footer{font-size:14px;color:var(--muted);border-top:1px solid var(--line);paddin
 </footer>
 
 </div>
+<button type="button" class="save-btn" id="saveImg" data-html2canvas-ignore>儲存為圖片</button>
+<script>
+(function(){
+  var btn=document.getElementById("saveImg");
+  var SRC="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+  function load(){return new Promise(function(ok,no){
+    if(window.html2canvas)return ok();
+    var t=document.createElement("script");t.src=SRC;t.onload=ok;t.onerror=no;document.head.appendChild(t);});}
+  btn.addEventListener("click",async function(){
+    var label=btn.textContent;btn.disabled=true;btn.textContent="產生圖片中…";
+    try{
+      await load();
+      if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+      var el=document.body,w=el.scrollWidth,h=el.scrollHeight;
+      // keep canvas under ~16M px so phones can render it
+      var scale=Math.min(2,Math.sqrt(16e6/(w*h)));
+      var bg=getComputedStyle(document.body).backgroundColor;
+      var canvas=await html2canvas(el,{scale:scale,backgroundColor:bg,useCORS:true,windowWidth:document.documentElement.clientWidth,scrollX:0,scrollY:-window.scrollY});
+      var blob=await new Promise(function(r){canvas.toBlob(r,"image/png");});
+      var name="airway-講義重點.png",file=new File([blob],name,{type:"image/png"});
+      if(navigator.canShare&&navigator.canShare({files:[file]})&&/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
+        await navigator.share({files:[file],title:"呼吸道處置與氣管插管：講義重點"});
+      }else{
+        var url=URL.createObjectURL(blob),a=document.createElement("a");
+        a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+        setTimeout(function(){URL.revokeObjectURL(url);},4000);
+      }
+    }catch(e){
+      if(!e||e.name!=="AbortError")alert("圖片產生失敗，請改用瀏覽器的截圖或列印功能。");
+    }finally{btn.disabled=false;btn.textContent=label;}
+  });
+})();
+</script>
 </body>
 </html>
