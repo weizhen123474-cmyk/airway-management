@@ -58,7 +58,14 @@ figcaption{font-size:13px;color:var(--muted);line-height:1.6}
 .save-btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .save-btn[disabled]{opacity:.7;cursor:progress}
 @media (prefers-color-scheme: dark){.save-btn{color:#10151f}}
-@media print{.save-btn{display:none}}
+@media print{.save-btn,.shot{display:none}}
+.shot{position:fixed;inset:0;z-index:20;background:#10151f;display:flex;flex-direction:column;gap:12px;padding:16px;color:#fff}
+.shot[hidden]{display:none}
+.shot-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.shot-bar p{flex:1;min-width:180px;font-size:15px}
+.shot-bar a,.shot-bar button{font:inherit;font-size:15px;color:#10151f;background:#fff;border:none;border-radius:999px;padding:8px 16px;text-decoration:none;cursor:pointer}
+.shot-scroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:8px;background:#fff}
+.shot-scroll img{display:block;width:100%;height:auto;-webkit-touch-callout:default}
 footer{font-size:14px;color:var(--muted);border-top:1px solid var(--line);padding-top:20px;display:flex;flex-direction:column;gap:6px}
 </style>
 </head>
@@ -329,34 +336,43 @@ footer{font-size:14px;color:var(--muted);border-top:1px solid var(--line);paddin
 
 </div>
 <button type="button" class="save-btn" id="saveImg" data-html2canvas-ignore>儲存為圖片</button>
+<div class="shot" id="shot" hidden role="dialog" aria-modal="true" aria-label="儲存圖片" data-html2canvas-ignore>
+  <div class="shot-bar">
+    <p id="shotTip">手機請長按圖片儲存；電腦按「下載」。</p>
+    <a id="shotDl" download="airway-講義重點.jpg">下載</a>
+    <button type="button" id="shotClose">關閉</button>
+  </div>
+  <div class="shot-scroll"><img id="shotImg" alt="講義重點整頁圖片"></div>
+</div>
 <script>
 (function(){
-  var btn=document.getElementById("saveImg");
+  var btn=document.getElementById("saveImg"),box=document.getElementById("shot"),img=document.getElementById("shotImg"),dl=document.getElementById("shotDl"),url=null;
   var SRC="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
   function load(){return new Promise(function(ok,no){
     if(window.html2canvas)return ok();
     var t=document.createElement("script");t.src=SRC;t.onload=ok;t.onerror=no;document.head.appendChild(t);});}
+  function close(){box.hidden=true;document.body.style.overflow="";if(url){URL.revokeObjectURL(url);url=null;}img.removeAttribute("src");btn.focus();}
+  document.getElementById("shotClose").addEventListener("click",close);
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!box.hidden)close();});
   btn.addEventListener("click",async function(){
     var label=btn.textContent;btn.disabled=true;btn.textContent="產生圖片中…";
     try{
       await load();
-      if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+      document.querySelectorAll("img[loading=lazy]").forEach(function(i){i.loading="eager";});
       var el=document.body,w=el.scrollWidth,h=el.scrollHeight;
-      // keep canvas under ~16M px so phones can render it
-      var scale=Math.min(2,Math.sqrt(16e6/(w*h)));
+      // phones have tight canvas memory limits: cap total pixels lower there
+      var mobile=w<700,cap=mobile?6e6:16e6;
+      var scale=Math.max(0.5,Math.min(mobile?1.5:2,Math.sqrt(cap/(w*h))));
       var bg=getComputedStyle(document.body).backgroundColor;
-      var canvas=await html2canvas(el,{scale:scale,backgroundColor:bg,useCORS:true,windowWidth:document.documentElement.clientWidth,scrollX:0,scrollY:-window.scrollY});
-      var blob=await new Promise(function(r){canvas.toBlob(r,"image/png");});
-      var name="airway-講義重點.png",file=new File([blob],name,{type:"image/png"});
-      if(navigator.canShare&&navigator.canShare({files:[file]})&&/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)){
-        await navigator.share({files:[file],title:"呼吸道處置與氣管插管：講義重點"});
-      }else{
-        var url=URL.createObjectURL(blob),a=document.createElement("a");
-        a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
-        setTimeout(function(){URL.revokeObjectURL(url);},4000);
-      }
+      var canvas=await html2canvas(el,{scale:scale,backgroundColor:bg,useCORS:true,imageTimeout:8000,windowWidth:document.documentElement.clientWidth,scrollX:0,scrollY:-window.scrollY});
+      var blob=await new Promise(function(r){canvas.toBlob(r,"image/jpeg",0.9);});
+      if(!blob)throw new Error("toBlob failed");
+      url=URL.createObjectURL(blob);
+      img.src=url;dl.href=url;
+      box.hidden=false;document.body.style.overflow="hidden";
+      document.getElementById("shotClose").focus();
     }catch(e){
-      if(!e||e.name!=="AbortError")alert("圖片產生失敗，請改用瀏覽器的截圖或列印功能。");
+      alert("圖片產生失敗，請改用手機截圖或瀏覽器的列印功能。");
     }finally{btn.disabled=false;btn.textContent=label;}
   });
 })();
