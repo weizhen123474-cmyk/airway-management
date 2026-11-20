@@ -364,7 +364,9 @@ footer{font-size:14px;color:var(--muted);border-top:1px solid var(--line);paddin
       var mobile=w<700,cap=mobile?6e6:16e6;
       var scale=Math.max(0.5,Math.min(mobile?1.5:2,Math.sqrt(cap/(w*h))));
       var bg=getComputedStyle(document.body).backgroundColor;
-      var canvas=await html2canvas(el,{scale:scale,backgroundColor:bg,useCORS:true,imageTimeout:8000,windowWidth:document.documentElement.clientWidth,scrollX:0,scrollY:-window.scrollY});
+      var canvas=await html2canvas(el,{scale:scale,backgroundColor:bg,useCORS:true,imageTimeout:8000,windowWidth:document.documentElement.clientWidth,scrollX:0,scrollY:-window.scrollY,
+        // tables scroll sideways on narrow screens; unroll them so the image shows every column
+        onclone:function(d){var st=d.createElement("style");st.textContent=".tbl{overflow:visible!important}table{min-width:0!important;table-layout:auto}table{font-size:13px}th,td{padding:8px 6px}td:first-child,th:first-child{white-space:nowrap}";d.head.appendChild(st);}});
       var blob=await new Promise(function(r){canvas.toBlob(r,"image/jpeg",0.9);});
       if(!blob)throw new Error("toBlob failed");
       url=URL.createObjectURL(blob);
